@@ -1,0 +1,36 @@
+# El gateway en produccion. ArgoCD junta dos piezas: el chart, que sale del repo
+# de codigo fijado a un commit, y la version de la imagen, que sale de este repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  # Si borro este archivo, ArgoCD borra tambien todo lo que desplego el gateway.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # El proyecto lo crea Terraform: solo mis dos repos y solo el namespace sa-p8.
+  project: sa-p8
+  sources:
+    - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
+      # Un commit exacto y no main: si cambio el chart en main, produccion no
+      # se entera hasta que alguien actualice esta linea con un PR.
+      targetRevision: a4196542900517e86ddfc41e96818cdac1009ba2
+      path: P8/charts/gateway
+      helm:
+        releaseName: gateway
+        valueFiles:
+          - values-prod.yaml
+          # El ultimo gana: la version de la imagen la decide este repo.
+          - $gitops/valores/gateway.yaml
+    # Esta segunda fuente no despliega nada, solo presta valores/ a la primera.
+    - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+      targetRevision: main
+      ref: gitops
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sa-p8
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
