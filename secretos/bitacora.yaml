@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: bitacora-secreto
+  namespace: sa-p8
+spec:
+  encryptedData:
+    DATABASE_URL: AgAdz4p10+JaPLdfpeyQdiYBduVKbnI86EFr8yW6m1tfpYqBFsO6WbPvGby0k7lBvjYuh2BWuP8Q+X7F8ZqmNr/ORiqq9EVZhqAZ8W8scIb08CpKB+rz5bF+05wYuw0jRn8iDdnoL8TaF77iqN7Eb5EvEkN4Dqu4WCh97d4Y5VMEbJrhce/81u8v+XrYA5pNSGsA49+p5pX1Z5wziW+okl4KTZn8vZZWxD6jaDTqiundrZQizQWE1ml9DVoyVVE/waXwz0HAfYcG6lMuOQARVHOPZjjTkiW1lajzVdZ31jq/vV32Ljb9ZTYmXNibllsONT4FyOSrb5O7vzg+JXH7NbsgmIE1GmNAFG/Mx9nFqD4vUmGWStBplCq2rh6ORMbXP3UjxWHBJES7TnT+Xqrnw32fSy6qMdCOaQjStJUiozbmoyvNU8/w8ySkN6jtqX4zby8fwQsrCVk4vqvFUb2o7fvznZMdhQk1Y+BdGnqxWN9C7XpiczfK5VQwX5cBR27jEAZAuO7EZbQ7GaCWHjyqU+bbrBBqNSdGP+D01gh/xCz7XxR9pkatfX2w1+BAWkziei2H578aI7wQ4v//RhrqnsHlwpl/91pH++CrXaS4HeVrTCS0J/Zk202rq/2O9wSXPpO5ecH1pbpag405gh4xqblNX/EUSLUnb07l8poCqXr4ghDL1ZGvrcaeACqDFoIlt1lZei1OXEzu4CEVWiyrJgOyVEN1IMXHRHOoToZYttO++hmLJ+IG9r9GLIIkRfucAemrUbMcLosmETyEL2DWMx2othHs6SOh+WIfIOmyAtbP/+7ZW6tcdF3daL2DDD3VYLw=
+  template:
+    metadata:
+      name: bitacora-secreto
+      namespace: sa-p8
+    type: Opaque

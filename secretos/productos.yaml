@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: productos-secreto
+  namespace: sa-p8
+spec:
+  encryptedData:
+    DATABASE_URL: AgAXokSrTBUePX6yjujwFnoo6z1gb0N5PwosvHAoqGEEecUUmqSw9BlCrZdJVon5cn+XOlMzLDnPEl+vsJGaT0oh0kyVwuI1QKXE+YbKEgZxFYQocZ4/mT1AhMLW80XENHn1EYbo/f3VVoJpN3SntaD+/1sT6cG3fqAHtO6HAusAbCKKu0wurrlXWlRuoK278d//mqKr11gcXir+z2JGsUeyYXYZYKrov4cKUaw0GpzxuAi+lwxn7n8GVXGaPqRESHpunMozyt3COLAaqAQV/2IWwlVO3IWgTgkBhb3lr0plR/Gn91toguWGrj9+lEOMwM8blJkbwvKWdtBJpnrV8a17rFmSNiym0/PSm5BewT6W1wgOYKXBtSoAt2EaqeQY3V0bFFd60w1+n1AShA0cEMMR28qqPaVhftYhDhnaFgmtUNEAIXCIMdUXOJ+MOnLvEQlAtGOGWTS4ZPlV9q0/itFbkaFtjK84jmLF29nCnzFb+OErHPAlm3wzCY3wGuJrMmoYpt3kh7ul7wLwj4e3cqeo7jstEHYOnCgkn/CfGGaG1dxF8z38ihWxcGJYReGeh8ayLLxwZGGZOuoAybeiIOlFZKbDKc96CuWnrEVaMQKp5J+PCbkgYRhWSNWFNx69O+TXoe522Adi9JCUpQo8WxgHtick5YxulEWkSIps07RQftvgv+6lPDsSg0I7hU8yqIH2YSA9DZBlfwER6vt1yo5svehMZXvbyh08qK5vVfnsYVwLyUiotgRQtM98GMNS8vLI79e8xnoXCfuP0n3tuHyDS7/FYJva78d0xTakrIok0rn7Ru5Th8kKA5ZzqHIPoSJn
+  template:
+    metadata:
+      name: productos-secreto
+      namespace: sa-p8
+    type: Opaque

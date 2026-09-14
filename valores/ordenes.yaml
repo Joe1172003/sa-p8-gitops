@@ -1,0 +1,3 @@
+# Version de la imagen de ordenes que corre en produccion. Solo cambia por PR.
+imagen:
+  etiqueta: "1.0.1"

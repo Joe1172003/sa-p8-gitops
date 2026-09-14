@@ -1,0 +1,4 @@
+# Version de las dos imagenes de los cronjobs que corren en produccion.
+# Solo cambia por PR.
+imagen:
+  etiqueta: "1.0.1"

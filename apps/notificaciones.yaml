@@ -1,0 +1,36 @@
+# El consumidor de la cola de notificaciones.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notificaciones
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: sa-p8
+  sources:
+    - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
+      targetRevision: a4196542900517e86ddfc41e96818cdac1009ba2
+      path: P8/charts/notificaciones
+      helm:
+        releaseName: notificaciones
+        valueFiles:
+          - values-prod.yaml
+          - $gitops/valores/notificaciones.yaml
+    - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+      targetRevision: main
+      ref: gitops
+    # El secreto cifrado. ArgoCD lo aplica tal cual y el controlador de
+    # Sealed Secrets lo abre dentro del cluster.
+    - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+      targetRevision: main
+      path: secretos
+      directory:
+        include: notificaciones.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sa-p8
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
