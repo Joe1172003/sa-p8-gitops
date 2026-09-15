@@ -10,7 +10,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: 1cdc7fe69942a6ca4df45eb07bbef8a4ad10ad13 # v2.1.0
+      targetRevision: f9de49bb8cc3921c74e35f03dbbb652bfc56945a # v2.2.0
       path: P8/charts/ordenes
       helm:
         releaseName: ordenes
