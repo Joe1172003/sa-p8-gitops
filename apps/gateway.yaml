@@ -34,3 +34,7 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      # Cuando el gateway paso de Deployment a Rollout: primero se levanta el
+      # Rollout y recien cuando esta sano se borra el Deployment. Sin corte.
+      - PruneLast=true
