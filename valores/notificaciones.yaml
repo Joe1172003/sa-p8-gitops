@@ -1,3 +1,3 @@
 # Version de la imagen de notificaciones que corre en produccion. Solo cambia por PR.
 imagen:
-  etiqueta: "2.0.0"
+  etiqueta: "2.1.0"
