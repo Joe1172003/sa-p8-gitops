@@ -7,7 +7,7 @@ El código y los charts viven en [Practicas-SA-B-202200271](https://github.com/J
 ## Qué hay en cada carpeta
 
 - `apps/`: una Application de ArgoCD por componente. Cada una apunta al chart del repo de código, fijado a un commit.
-- `valores/`: la versión de la imagen de cada componente. Es lo que actualiza el pipeline, siempre con un Pull Request.
+- `valores/`: la versión de la imagen de cada componente. Es lo que actualiza el pipeline, siempre con un Pull Request. `valores/politicas.yaml` decide si las políticas de Kyverno bloquean (`Enforce`) o solo anotan (`Audit`).
 - `secretos/`: las contraseñas y llaves de cada componente, cifradas con Sealed Secrets. Aunque el repo es público, solo el controlador que vive en el clúster puede abrirlas. Las genera y las cifra el script `P8/scripts/sellar-secretos.ps1` del repo de código.
 
 La aplicación raíz (`raiz`, en el namespace `argocd`) la crea Terraform y lee la carpeta `apps/`.
