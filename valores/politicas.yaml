@@ -1,4 +1,1 @@
-# Que hace Kyverno con lo que incumple una politica: Audit solo lo anota en un
-# reporte, Enforce lo rechaza. Arranca en Audit para comprobar en el cluster que
-# todo lo que corre cumple, antes de que empiece a bloquear.
-accion: Audit
+accion: Enforce
