@@ -10,7 +10,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: f9de49bb8cc3921c74e35f03dbbb652bfc56945a # v2.2.0
+      targetRevision: 3e7a2d27e6f0739d77a08b3b8c8a26f3d05ea0c9 # v2.3.0
       path: P8/charts/productos
       helm:
         releaseName: productos
