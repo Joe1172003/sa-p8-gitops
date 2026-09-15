@@ -1,4 +1,4 @@
 # Version de la imagen del gateway que corre en produccion. Solo cambia por PR:
 # el pipeline lo abre y ArgoCD lo aplica cuando se aprueba.
 imagen:
-  etiqueta: "2.3.0"
+  etiqueta: "2.2.0"
