@@ -1,3 +1,12 @@
 # Version de la imagen de auth que corre en produccion. Solo cambia por PR.
 imagen:
   etiqueta: "2.2.0"
+
+# Recursos de produccion. Kyverno rechaza cualquier Pod sin limites.
+recursos:
+  requests:
+    cpu: 15m
+    memoria: 128Mi
+  limits:
+    cpu: 300m
+    memoria: 320Mi
