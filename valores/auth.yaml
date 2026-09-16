@@ -1,6 +1,6 @@
 # Version de la imagen de auth que corre en produccion. Solo cambia por PR.
 imagen:
-  etiqueta: "2.2.0"
+  etiqueta: "2.2.1"
 
 # Recursos de produccion. Kyverno rechaza cualquier Pod sin limites.
 recursos:

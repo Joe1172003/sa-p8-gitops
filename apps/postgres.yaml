@@ -11,7 +11,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: f9de49bb8cc3921c74e35f03dbbb652bfc56945a # v2.2.0
+      targetRevision: d3fe0aa69bd607b952d7625092234dec0f751946 # v2.2.1
       path: P8/charts/postgres
       helm:
         releaseName: postgres
