@@ -12,7 +12,7 @@ spec:
   project: politicas
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: b4caa04e6cc230276b1ba2c8297278432652058e
+      targetRevision: d3fe0aa69bd607b952d7625092234dec0f751946 # v2.2.1
       path: P8/charts/politicas
       helm:
         releaseName: politicas
