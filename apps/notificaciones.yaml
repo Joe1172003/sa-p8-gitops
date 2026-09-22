@@ -10,7 +10,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: d3fe0aa69bd607b952d7625092234dec0f751946 # v2.2.1
+      targetRevision: 0d1a7240524c2f1b7f34be6702926929f7cba11a # v2.2.1 con anti-afinidad
       path: P8/charts/notificaciones
       helm:
         releaseName: notificaciones
