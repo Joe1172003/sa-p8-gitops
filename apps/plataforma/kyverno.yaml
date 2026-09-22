@@ -55,6 +55,16 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
+  # El chart renderiza sus CRDs con "labels: {}" y "annotations: {}" vacios, y
+  # Kubernetes guarda el objeto sin esos campos. ArgoCD compara los dos lados y
+  # ve una diferencia que nunca se puede cerrar, asi que la app queda OutOfSync
+  # para siempre. Le digo que ignore esos dos campos en los CRDs.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /metadata/labels
+        - /metadata/annotations
   syncPolicy:
     automated:
       prune: true
