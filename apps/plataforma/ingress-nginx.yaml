@@ -44,9 +44,10 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-  # La NetworkPolicy del gateway deja entrar al trafico que viene de un
-  # namespace con esta etiqueta. Si el namespace naciera sin ella, el Ingress
-  # quedaria bloqueado.
-  managedNamespaceMetadata:
-    labels:
-      name: ingress-nginx
+    # La NetworkPolicy del gateway deja entrar al trafico que viene de un
+    # namespace con esta etiqueta. Si el namespace naciera sin ella, el Ingress
+    # quedaria bloqueado. Va dentro de syncPolicy: al nivel de spec, ArgoCD lo
+    # descarta y la app queda OutOfSync para siempre.
+    managedNamespaceMetadata:
+      labels:
+        name: ingress-nginx
