@@ -45,6 +45,11 @@ spec:
               provider: gcp
               bucket: sa-p9-velero-202200271
               default: true
+              config:
+                # Con Workload Identity, el plugin de GCP no adivina que cuenta
+                # usar: hay que nombrarla aca. Sin esta linea el destino queda
+                # en Unavailable con "serviceAccount is expected to be provided".
+                serviceAccount: velero-sa-p9@sa-p6-202200271.iam.gserviceaccount.com
           volumeSnapshotLocation:
             - name: default
               provider: gcp
