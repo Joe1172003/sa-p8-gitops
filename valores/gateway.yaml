@@ -11,3 +11,9 @@ recursos:
   limits:
     cpu: 300m
     memoria: 256Mi
+
+# Host publico del gateway. Sale de la IP fija que reserva Terraform en la capa
+# permanente de la P9, asi que no cambia cuando se reconstruye el cluster.
+# Este archivo se aplica despues de values-prod.yaml, por eso manda.
+ingress:
+  host: 136.113.9.71.nip.io

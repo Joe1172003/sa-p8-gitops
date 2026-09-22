@@ -1,0 +1,64 @@
+# Kyverno: el guardia de la puerta. Revisa cada Pod de sa-p8 antes de que se
+# cree y rechaza lo que no cumple las 4 politicas. Las politicas viajan aparte,
+# en la app politicas, que se sincroniza despues.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://kyverno.github.io/kyverno/
+    chart: kyverno
+    targetRevision: 3.9.1 # Kyverno v1.19.1
+    helm:
+      releaseName: kyverno
+      values: |
+        admissionController:
+          replicas: 1
+          container:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+        reportsController:
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+        # Estos dos crean o borran recursos por su cuenta. Mis politicas solo
+        # validan, asi que apagarlos son 200m menos de CPU reservado.
+        backgroundController:
+          enabled: false
+        cleanupController:
+          enabled: false
+        config:
+          webhooks:
+            # Kubernetes solo le consulta a Kyverno por lo que pasa en sa-p8. Si
+            # Kyverno se cae, el resto del cluster sigue funcionando.
+            namespaceSelector:
+              matchExpressions:
+                - key: kubernetes.io/metadata.name
+                  operator: In
+                  values:
+                    - sa-p8
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

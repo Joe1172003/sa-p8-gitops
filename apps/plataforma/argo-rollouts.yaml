@@ -1,0 +1,46 @@
+# Argo Rollouts: el que gradua el trafico del canary del gateway y revierte
+# solo cuando un analisis falla.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.43.1 # Argo Rollouts v1.10.0, la misma version del plugin de kubectl
+    helm:
+      releaseName: argo-rollouts
+      values: |
+        controller:
+          # El chart trae 2 para alta disponibilidad. Con 1 alcanza: si se cae,
+          # Kubernetes lo levanta y el canary sigue donde quedo.
+          replicas: 1
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+        # Sin dashboard web: el canary se sigue con el plugin de kubectl.
+        dashboard:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Los CRDs de Rollouts son grandes y no entran en la anotacion que ArgoCD
+      # usa por defecto para comparar.
+      - ServerSideApply=true

@@ -1,0 +1,94 @@
+# Velero: el seguro del sistema. Respalda los objetos del cluster y los discos
+# persistentes, y los guarda fuera del cluster, en un bucket de GCS.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: velero
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://vmware-tanzu.github.io/helm-charts
+    chart: velero
+    targetRevision: 12.2.0 # Velero 1.18.2
+    helm:
+      releaseName: velero
+      values: |
+        # El plugin que sabe hablar con GCS y con los discos de Google.
+        initContainers:
+          - name: velero-plugin-for-gcp
+            image: velero/velero-plugin-for-gcp:v1.14.3
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /target
+                name: plugins
+
+        # Sin Secret de credenciales: las pide al vuelo por Workload Identity.
+        credentials:
+          useSecret: false
+
+        serviceAccount:
+          server:
+            create: true
+            name: velero-server
+            annotations:
+              iam.gke.io/gcp-service-account: velero-sa-p9@sa-p6-202200271.iam.gserviceaccount.com
+
+        configuration:
+          backupStorageLocation:
+            - name: default
+              provider: gcp
+              bucket: sa-p9-velero-202200271
+              default: true
+          volumeSnapshotLocation:
+            - name: default
+              provider: gcp
+              config:
+                project: sa-p6-202200271
+                snapshotLocation: us-central1
+
+        backupsEnabled: true
+        snapshotsEnabled: true
+
+        # Los discos se respaldan con snapshots de Google (CSI), no copiando
+        # archivo por archivo: no hace falta el agente en cada nodo.
+        deployNodeAgent: false
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # GKE trae el controlador de snapshots pero ningun VolumeSnapshotClass.
+        # Sin uno etiquetado para Velero, los discos quedarian fuera del
+        # respaldo, que es el error que el enunciado llama "respaldo sin
+        # volumenes".
+        extraObjects:
+          - apiVersion: snapshot.storage.k8s.io/v1
+            kind: VolumeSnapshotClass
+            metadata:
+              name: discos-gke
+              labels:
+                velero.io/csi-volumesnapshot-class: "true"
+            driver: pd.csi.storage.gke.io
+            # Retain: el snapshot sobrevive aunque se borre el VolumeSnapshot
+            # del cluster. Si el cluster desaparece, la copia sigue en GCP.
+            deletionPolicy: Retain
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: velero
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
