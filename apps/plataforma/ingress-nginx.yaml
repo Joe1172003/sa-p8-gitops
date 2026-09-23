@@ -18,7 +18,25 @@ spec:
       releaseName: ingress-nginx
       values: |
         controller:
-          replicaCount: 1
+          # Dos replicas y no una: en la prueba de perdida de nodo de la P9,
+          # el controlador vivia solo en el nodo que se drenaba y la entrada
+          # al cluster se caia unos 15 segundos, aunque los microservicios
+          # siguieran vivos. Era el punto unico de fallo de la puerta.
+          replicaCount: 2
+          # minAvailable crea un PodDisruptionBudget: Kubernetes no puede sacar
+          # la ultima replica viva durante un drenaje.
+          minAvailable: 1
+          # Y que no caigan las dos en el mismo nodo.
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: ingress-nginx
+                        app.kubernetes.io/component: controller
           service:
             # La IP fija que reserva Terraform en la capa permanente. Sin esto,
             # cada reconstruccion traeria una IP nueva y el host del gateway
