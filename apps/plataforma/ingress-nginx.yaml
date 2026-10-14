@@ -49,6 +49,11 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          # P10: expone /metrics en un Service aparte (puerto 10254). Prometheus
+          # lo raspa con el ServiceMonitor que declara kube-prometheus-stack, asi
+          # este chart no depende de los CRDs de Prometheus, que llegan despues.
+          metrics:
+            enabled: true
           admissionWebhooks:
             # El webhook valida los Ingress al crearlos. Lo dejo activo, pero
             # sin esperar a que el Job termine para dar la app por sana.

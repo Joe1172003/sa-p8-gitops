@@ -1,0 +1,53 @@
+# Tempo: el almacen de trazas. Cada peticion queda como una cascada de tramos
+# (gateway, ordenes, productos, postgres) bajo un mismo trace_id.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: 1.24.4 # Tempo 2.9.0
+    helm:
+      releaseName: tempo
+      values: |
+        tempo:
+          retention: 72h
+          reportingEnabled: false
+          # Solo OTLP: es lo unico que habla el Collector.
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: "0.0.0.0:4317"
+                http:
+                  endpoint: "0.0.0.0:4318"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+
+        persistence:
+          enabled: true
+          size: 10Gi
+          storageClassName: standard-rwo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
