@@ -24,6 +24,10 @@ spec:
         values: |
           fullnameOverride: kps
 
+          # Los CRDs los instala la app prometheus-crds, una ola antes.
+          crds:
+            enabled: false
+
           # GKE administra el plano de control y no deja verlo. Estos objetivos
           # quedarian caidos para siempre y sus alertas sonarian sin que yo pueda
           # hacer nada. Dataplane V2 tampoco usa kube-proxy.

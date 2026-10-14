@@ -1,0 +1,42 @@
+# Los tipos de Prometheus (Prometheus, ServiceMonitor, PrometheusRule...), una
+# ola antes que el resto del stack.
+#
+# Antes venian dentro de kube-prometheus-stack y llegaban casi al mismo tiempo
+# que el operador. El 14/10 el operador arranco, pregunto por el tipo
+# Prometheus, la API todavia no lo mostraba y apago su controlador para siempre:
+# no hubo Pod de Prometheus hasta que lo reinicie a mano. Con los CRDs en la
+# ola -2, cuando el operador arranca en la -1 ya estan.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-operator-crds
+    targetRevision: 32.0.1 # Prometheus Operator v0.94.1, la misma del operador
+    helm:
+      releaseName: prometheus-crds
+      values: |
+        crds:
+          annotations:
+            # Borrar un CRD borra todos los objetos de ese tipo: Prometheus,
+            # Alertmanager, mis reglas de alerta. Que ArgoCD nunca lo haga solo.
+            argocd.argoproj.io/sync-options: Prune=false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Los CRDs pasan el limite de 256 KB de la anotacion de kubectl apply.
+      - ServerSideApply=true
