@@ -1,0 +1,149 @@
+# OpenTelemetry Collector: la central de la telemetria. Recibe trazas y
+# metricas de los servicios por OTLP, lee los logs de los contenedores del nodo
+# y manda cada senal a su almacen: trazas a Tempo, metricas a Prometheus y logs
+# a Loki. Los servicios solo conocen al Collector.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: 0.176.0 # Collector 0.162.0
+    helm:
+      releaseName: otel-collector
+      values: |
+        fullnameOverride: otel-collector
+
+        # Uno por nodo: los logs de los contenedores estan en el disco de cada
+        # nodo, y solo un Pod que corre ahi los puede leer.
+        mode: daemonset
+        image:
+          repository: otel/opentelemetry-collector-contrib
+
+        presets:
+          # Lee /var/log/pods y separa el texto del log de la metadata de CRI.
+          logsCollection:
+            enabled: true
+          # Le pega a cada senal el pod, namespace y deployment de donde salio.
+          kubernetesAttributes:
+            enabled: true
+
+        # Cada servicio le habla al Collector de su mismo nodo, sin cruzar la red.
+        service:
+          enabled: true
+          internalTrafficPolicy: Local
+
+        ports:
+          jaeger-compact:
+            enabled: false
+          jaeger-thrift:
+            enabled: false
+          jaeger-grpc:
+            enabled: false
+          zipkin:
+            enabled: false
+          metrics:
+            enabled: true
+
+        # Las metricas del propio Collector: si se le acumulan o pierde datos.
+        podMonitor:
+          enabled: true
+
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 384Mi
+
+        config:
+          receivers:
+            jaeger: null
+            zipkin: null
+            prometheus: null
+            filelog:
+              # Solo mis servicios y la puerta de entrada. El resto del cluster
+              # no aporta a las preguntas que quiero responder.
+              include:
+                - /var/log/pods/sa-p8_*/*/*.log
+                - /var/log/pods/ingress-nginx_*/*/*.log
+
+          processors:
+            k8sattributes:
+              extract:
+                # La lista del preset tambien trae service.name y service.version
+                # sacados de etiquetas e imagen, y pisaria lo que manda el SDK.
+                # El canary separa versiones por service.version: que lo decida
+                # el codigo, no el Collector.
+                metadata:
+                  - k8s.namespace.name
+                  - k8s.pod.name
+                  - k8s.pod.uid
+                  - k8s.node.name
+                  - k8s.deployment.name
+                  - k8s.replicaset.name
+                  - k8s.statefulset.name
+                  - k8s.container.name
+                  - container.image.tag
+                labels:
+                  - tag_name: app
+                    key: app.kubernetes.io/name
+                    from: pod
+            # Los logs no traen service.name (eso lo pone el SDK en trazas y
+            # metricas). Uso la etiqueta app.kubernetes.io/name del Pod, que es
+            # el mismo nombre, asi Grafana cruza logs y trazas por servicio.
+            transform/nombre-servicio:
+              error_mode: ignore
+              log_statements:
+                - context: resource
+                  statements:
+                    - set(attributes["service.name"], attributes["app"]) where attributes["service.name"] == nil and attributes["app"] != nil
+                    - set(attributes["service.name"], attributes["k8s.container.name"]) where attributes["service.name"] == nil
+
+          exporters:
+            otlp/tempo:
+              endpoint: tempo.observabilidad.svc:4317
+              tls:
+                insecure: true
+            otlphttp/prometheus:
+              endpoint: http://kps-prometheus.observabilidad.svc:9090/api/v1/otlp
+              tls:
+                insecure: true
+            otlphttp/loki:
+              endpoint: http://loki.observabilidad.svc:3100/otlp
+              tls:
+                insecure: true
+
+          service:
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [memory_limiter, batch]
+                exporters: [otlp/tempo]
+              metrics:
+                receivers: [otlp]
+                processors: [memory_limiter, batch]
+                exporters: [otlphttp/prometheus]
+              logs:
+                receivers: [filelog]
+                processors: [memory_limiter, transform/nombre-servicio, batch]
+                exporters: [otlphttp/loki]
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

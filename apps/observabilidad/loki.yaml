@@ -1,0 +1,96 @@
+# Loki: el almacen de logs. Guarda lo que imprimen los servicios y lo deja
+# buscable por campo, por ejemplo todos los logs de una misma traza.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 7.3.0 # Loki 3.6.12
+    helm:
+      releaseName: loki
+      values: |
+        # Un solo proceso que hace todo (recibe, guarda y responde consultas).
+        # El modo distribuido son 3 componentes con replicas: para el volumen de
+        # este cluster seria pagar CPU por nada.
+        deploymentMode: SingleBinary
+
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2026-10-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: loki_index_
+                  period: 24h
+          limits_config:
+            # Lo mismo que Prometheus y Tempo: 3 dias.
+            retention_period: 72h
+            # El trace_id llega como metadato estructurado del log, no como
+            # etiqueta: asi se puede filtrar por el sin crear un indice por traza.
+            allow_structured_metadata: true
+          compactor:
+            retention_enabled: true
+            delete_request_store: filesystem
+
+        singleBinary:
+          replicas: 1
+          persistence:
+            enabled: true
+            size: 10Gi
+            storageClass: standard-rwo
+          resources:
+            requests:
+              cpu: 100m
+              memory: 320Mi
+            limits:
+              memory: 768Mi
+
+        # Lo que sobra en modo de un solo proceso.
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
+        gateway:
+          enabled: false
+        # Las caches de memcached piden varios GB de memoria por defecto.
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+        lokiCanary:
+          enabled: false
+        # Reglas de alerta sobre logs: las alertas salen de Prometheus.
+        sidecar:
+          rules:
+            enabled: false
+        test:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

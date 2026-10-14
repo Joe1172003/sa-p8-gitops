@@ -1,0 +1,232 @@
+# Prometheus, Alertmanager y Grafana en un solo chart. Prometheus guarda las
+# metricas, Alertmanager decide a quien avisar y Grafana muestra todo junto:
+# metricas, logs de Loki y trazas de Tempo.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    # Despues de Kyverno y Rollouts (-2) y antes de los microservicios (0): el
+    # canary del gateway le pregunta a este Prometheus si la version nueva sirve.
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 92.7.0 # Prometheus Operator v0.94.1, Grafana 13.2.4
+      helm:
+        releaseName: kps
+        values: |
+          fullnameOverride: kps
+
+          # GKE administra el plano de control y no deja verlo. Estos objetivos
+          # quedarian caidos para siempre y sus alertas sonarian sin que yo pueda
+          # hacer nada. Dataplane V2 tampoco usa kube-proxy.
+          kubeControllerManager:
+            enabled: false
+          kubeScheduler:
+            enabled: false
+          kubeEtcd:
+            enabled: false
+          kubeProxy:
+            enabled: false
+          coreDns:
+            enabled: false
+
+          # El chart trae decenas de alertas y tableros genericos. Las alertas que
+          # valen la pena las escribo yo (por presupuesto de error) y el tablero
+          # tambien: el enunciado pide borrar las que nadie atenderia.
+          defaultRules:
+            create: false
+
+          prometheusOperator:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 96Mi
+              limits:
+                memory: 256Mi
+
+          kube-state-metrics:
+            resources:
+              requests:
+                cpu: 20m
+                memory: 64Mi
+              limits:
+                memory: 192Mi
+
+          prometheus-node-exporter:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 32Mi
+              limits:
+                memory: 64Mi
+
+          alertmanager:
+            alertmanagerSpec:
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 48Mi
+                limits:
+                  memory: 128Mi
+
+          prometheus:
+            prometheusSpec:
+              # Cada 15 s y no cada 30: el canary decide en pocos minutos y
+              # necesita varias muestras dentro de cada paso.
+              scrapeInterval: 15s
+              evaluationInterval: 15s
+              retention: 3d
+              retentionSize: 8GB
+
+              # Las metricas de mis servicios no se raspan: el Collector las
+              # empuja por OTLP. service.version pasa a ser etiqueta para poder
+              # separar la version estable de la candidata.
+              enableOTLPReceiver: true
+              otlp:
+                promoteResourceAttributes:
+                  - service.version
+                  - k8s.namespace.name
+                  - k8s.pod.name
+
+              # Que lea ServiceMonitor, PodMonitor y PrometheusRule de cualquier
+              # namespace, no solo los que trae este chart.
+              serviceMonitorSelectorNilUsesHelmValues: false
+              podMonitorSelectorNilUsesHelmValues: false
+              ruleSelectorNilUsesHelmValues: false
+              probeSelectorNilUsesHelmValues: false
+
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 640Mi
+                limits:
+                  memory: 1536Mi
+              storageSpec:
+                volumeClaimTemplate:
+                  spec:
+                    storageClassName: standard-rwo
+                    accessModes: ["ReadWriteOnce"]
+                    resources:
+                      requests:
+                        storage: 10Gi
+
+            # La puerta de entrada al cluster: cuantas peticiones llegan, con que
+            # codigo y cuanto tardan, medido desde afuera de los servicios.
+            additionalServiceMonitors:
+              - name: ingress-nginx
+                namespaceSelector:
+                  matchNames:
+                    - ingress-nginx
+                selector:
+                  matchLabels:
+                    app.kubernetes.io/name: ingress-nginx
+                    app.kubernetes.io/component: controller
+                endpoints:
+                  - port: metrics
+                    interval: 15s
+
+          grafana:
+            fullnameOverride: grafana
+            defaultDashboardsEnabled: false
+            # El Pod de "helm test": ArgoCD no corre pruebas de Helm.
+            testFramework:
+              enabled: false
+
+            # La contrasena viaja cifrada como SealedSecret (secretos/grafana.yaml).
+            admin:
+              existingSecret: grafana-admin
+              userKey: usuario
+              passwordKey: contrasena
+
+            # Por el mismo ingress-nginx del gateway: la cuota de IPs esta en 3 de 4.
+            ingress:
+              enabled: true
+              ingressClassName: nginx
+              hosts:
+                - grafana.136.113.9.71.nip.io
+
+            resources:
+              requests:
+                cpu: 50m
+                memory: 160Mi
+              limits:
+                memory: 384Mi
+
+            sidecar:
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 48Mi
+                limits:
+                  memory: 128Mi
+              # Los tableros llegan como ConfigMap con la etiqueta grafana_dashboard.
+              dashboards:
+                searchNamespace: ALL
+
+            grafana.ini:
+              analytics:
+                check_for_updates: false
+                reporting_enabled: false
+
+            # Loki y Tempo enlazados en las dos direcciones por el trace_id:
+            # desde un log se abre su traza y desde una traza se ven sus logs.
+            additionalDataSources:
+              - name: Loki
+                uid: loki
+                type: loki
+                access: proxy
+                url: http://loki.observabilidad.svc:3100
+                jsonData:
+                  derivedFields:
+                    - name: trace_id
+                      matcherType: label
+                      matcherRegex: trace_id
+                      datasourceUid: tempo
+                      url: "$${__value.raw}"
+                      urlDisplayLabel: Ver la traza en Tempo
+              - name: Tempo
+                uid: tempo
+                type: tempo
+                access: proxy
+                url: http://tempo.observabilidad.svc:3200
+                jsonData:
+                  tracesToLogsV2:
+                    datasourceUid: loki
+                    spanStartTimeShift: "-5m"
+                    spanEndTimeShift: "5m"
+                    filterByTraceID: true
+                    tags:
+                      - key: service.name
+                        value: service_name
+                  lokiSearch:
+                    datasourceUid: loki
+                  nodeGraph:
+                    enabled: true
+
+    # La contrasena de admin de Grafana, cifrada. El controlador de Sealed
+    # Secrets la abre dentro del cluster.
+    - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+      targetRevision: main
+      path: secretos
+      directory:
+        include: grafana.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Los CRDs de Prometheus pasan el limite de 256 KB de la anotacion que usa
+      # kubectl apply. Con server-side apply esa anotacion no existe.
+      - ServerSideApply=true
