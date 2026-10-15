@@ -74,6 +74,12 @@ spec:
 
           alertmanager:
             alertmanagerSpec:
+              # P10: la configuracion entera (a quien avisar, por donde y con que
+              # clave) viene de un SealedSecret: secretos/alertmanager-correo.yaml.
+              # La version legible, con marcadores, esta en
+              # P10/alertmanager/alertmanager.plantilla.yaml del repo de codigo.
+              useExistingSecret: true
+              configSecret: alertmanager-correo
               resources:
                 requests:
                   cpu: 10m
@@ -87,8 +93,11 @@ spec:
               # necesita varias muestras dentro de cada paso.
               scrapeInterval: 15s
               evaluationInterval: 15s
-              retention: 3d
-              retentionSize: 8GB
+              # 8 dias: la ventana de los SLO es de 7 y la regla de 7 dias
+              # necesita tener la semana completa. Medido: ~190 MB cada 6 h,
+              # unos 5 GB por semana en un disco de 10 GiB.
+              retention: 8d
+              retentionSize: 9GB
 
               # Las metricas de mis servicios no se raspan: el Collector las
               # empuja por OTLP. service.version pasa a ser etiqueta para poder
@@ -221,7 +230,8 @@ spec:
       targetRevision: main
       path: secretos
       directory:
-        include: grafana.yaml
+        # La contrasena de Grafana y la configuracion de Alertmanager.
+        include: '{grafana.yaml,alertmanager-correo.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: observabilidad

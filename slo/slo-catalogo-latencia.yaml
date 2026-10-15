@@ -1,0 +1,106 @@
+# SLO 2 - Latencia del catalogo (P10).
+#
+#   Promesa:   el 99 % de las consultas al catalogo responden en menos de
+#              500 ms.
+#   Ventana:   7 dias moviles.
+#   Indicador: consultas a /graphql/productos del gateway con duracion
+#              <= 0.5 s / consultas a /graphql/productos.
+#
+# 0.5 s es un limite del histograma (le="0.5"): el conteo es exacto, no una
+# estimacion entre dos buckets. Justificacion en P10/slo/definicion-slo.md.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-catalogo-latencia
+  namespace: observabilidad
+spec:
+  groups:
+    # Proporcion de consultas lentas (mas de 500 ms) en cada ventana.
+    - name: slo-catalogo-indicador
+      interval: 30s
+      rules:
+        - record: slo:catalogo_lentas:ratio_rate5m
+          expr: |
+            1 - (
+              sum(rate(http_server_request_duration_seconds_bucket{job="gateway", http_route="/graphql/productos", le="0.5"}[5m]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="gateway", http_route="/graphql/productos"}[5m]))
+            )
+        - record: slo:catalogo_lentas:ratio_rate30m
+          expr: |
+            1 - (
+              sum(rate(http_server_request_duration_seconds_bucket{job="gateway", http_route="/graphql/productos", le="0.5"}[30m]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="gateway", http_route="/graphql/productos"}[30m]))
+            )
+        - record: slo:catalogo_lentas:ratio_rate1h
+          expr: |
+            1 - (
+              sum(rate(http_server_request_duration_seconds_bucket{job="gateway", http_route="/graphql/productos", le="0.5"}[1h]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="gateway", http_route="/graphql/productos"}[1h]))
+            )
+        - record: slo:catalogo_lentas:ratio_rate6h
+          expr: |
+            1 - (
+              sum(rate(http_server_request_duration_seconds_bucket{job="gateway", http_route="/graphql/productos", le="0.5"}[6h]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="gateway", http_route="/graphql/productos"}[6h]))
+            )
+
+    - name: slo-catalogo-presupuesto
+      interval: 1m
+      rules:
+        - record: slo:catalogo_objetivo:ratio
+          expr: vector(0.99)
+        - record: slo:catalogo_lentas:ratio_rate7d
+          expr: |
+            1 - (
+              sum(rate(http_server_request_duration_seconds_bucket{job="gateway", http_route="/graphql/productos", le="0.5"}[7d]))
+              /
+              sum(rate(http_server_request_duration_seconds_count{job="gateway", http_route="/graphql/productos"}[7d]))
+            )
+        # El indicador: que fraccion del catalogo respondio rapido en la semana.
+        - record: slo:catalogo_sli:ratio_rate7d
+          expr: 1 - slo:catalogo_lentas:ratio_rate7d
+        # Cuanto del 1 % de consultas lentas permitidas ya se gasto (1 = todo).
+        - record: slo:catalogo_presupuesto_consumido:ratio
+          expr: slo:catalogo_lentas:ratio_rate7d / (1 - 0.99)
+
+    # Mismo esquema que disponibilidad, con presupuesto del 1 %.
+    - name: slo-catalogo-alertas
+      interval: 30s
+      rules:
+        # Ritmo 14.4: 14.4 x 1 % = 14.4 % de consultas lentas. Presupuesto
+        # agotado en ~12 h.
+        - alert: SloCatalogoLatenciaConsumoRapido
+          expr: |
+            slo:catalogo_lentas:ratio_rate1h > (14.4 * 0.01)
+            and
+            slo:catalogo_lentas:ratio_rate5m > (14.4 * 0.01)
+          for: 2m
+          labels:
+            severity: critica
+            slo: catalogo-latencia
+          annotations:
+            summary: "El catalogo esta lento: {{ $value | humanizePercentage }} de consultas tardan mas de 500 ms"
+            description: "Mas del 14 % de las consultas al catalogo superan los 500 ms en la ultima hora y siguen asi en los ultimos 5 min. A este ritmo el presupuesto de la semana se acaba en unas 12 horas."
+            intervencion: "El catalogo es el 90 % de lo que hacen los clientes. Una de cada siete visitas espera mas de medio segundo, y quien espera se va."
+            runbook_url: https://github.com/Joe1172003/Practicas-SA-B-202200271/blob/main/P10/runbooks/slo-catalogo-latencia-consumo-rapido.md
+
+        # Ritmo 6: 6 % de consultas lentas sostenido, presupuesto en ~28 h.
+        - alert: SloCatalogoLatenciaConsumoLento
+          expr: |
+            slo:catalogo_lentas:ratio_rate6h > (6 * 0.01)
+            and
+            slo:catalogo_lentas:ratio_rate30m > (6 * 0.01)
+          for: 15m
+          labels:
+            severity: advertencia
+            slo: catalogo-latencia
+          annotations:
+            summary: "Catalogo lento de forma sostenida: {{ $value | humanizePercentage }} en 6 horas"
+            description: "Mas del 6 % de las consultas al catalogo tardan mas de 500 ms desde hace horas. Suele ser falta de recursos o una dependencia lenta, no una caida."
+            intervencion: "Revisarlo hoy en horario: si sigue asi, la promesa de la semana se rompe en poco mas de un dia."
+            runbook_url: https://github.com/Joe1172003/Practicas-SA-B-202200271/blob/main/P10/runbooks/slo-catalogo-latencia-consumo-lento.md

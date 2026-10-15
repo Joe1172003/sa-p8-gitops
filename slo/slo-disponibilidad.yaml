@@ -1,0 +1,105 @@
+# SLO 1 - Disponibilidad de la tienda (P10).
+#
+#   Promesa:   el 99.5 % de las peticiones de los clientes se responden sin
+#              error del servidor (5xx).
+#   Ventana:   7 dias moviles.
+#   Indicador: peticiones del gateway sin 5xx / peticiones del gateway.
+#              Sin /health (no es un cliente) y sin 4xx (error del cliente).
+#
+# La justificacion de los numeros esta en P10/slo/definicion-slo.md del repo
+# de codigo.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-disponibilidad
+  namespace: observabilidad
+spec:
+  groups:
+    # La proporcion de errores en cada ventana que usan las alertas. Se
+    # precalcula cada 30 s para que las alertas y el tablero lean un numero
+    # listo en vez de recorrer la historia cada vez.
+    - name: slo-disponibilidad-indicador
+      interval: 30s
+      rules:
+        - record: slo:disponibilidad_errores:ratio_rate5m
+          expr: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway", http_response_status_code=~"5.."}[5m])) or vector(0))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[5m]))
+        - record: slo:disponibilidad_errores:ratio_rate30m
+          expr: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway", http_response_status_code=~"5.."}[30m])) or vector(0))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[30m]))
+        - record: slo:disponibilidad_errores:ratio_rate1h
+          expr: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway", http_response_status_code=~"5.."}[1h])) or vector(0))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[1h]))
+        - record: slo:disponibilidad_errores:ratio_rate6h
+          expr: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway", http_response_status_code=~"5.."}[6h])) or vector(0))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[6h]))
+
+    # La ventana del SLO y el presupuesto. Cada minuto alcanza: la semana no
+    # cambia en 30 s.
+    - name: slo-disponibilidad-presupuesto
+      interval: 1m
+      rules:
+        - record: slo:disponibilidad_objetivo:ratio
+          expr: vector(0.995)
+        - record: slo:disponibilidad_errores:ratio_rate7d
+          expr: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway", http_response_status_code=~"5.."}[7d])) or vector(0))
+            /
+            sum(rate(http_server_request_duration_seconds_count{job="gateway"}[7d]))
+        # El indicador: que fraccion de peticiones salio bien en la semana.
+        - record: slo:disponibilidad_sli:ratio_rate7d
+          expr: 1 - slo:disponibilidad_errores:ratio_rate7d
+        # Cuanto del presupuesto (el 0.5 % que se permite fallar) ya se gasto.
+        # 0 = nada, 1 = todo; mas de 1 = la promesa de la semana esta rota.
+        - record: slo:disponibilidad_presupuesto_consumido:ratio
+          expr: slo:disponibilidad_errores:ratio_rate7d / (1 - 0.995)
+
+    # Alertas por ritmo de consumo (burn rate), no por umbral instantaneo.
+    # Ritmo 1 = gastar el presupuesto justo en 7 dias. Cada alerta mira dos
+    # ventanas: la larga confirma que es grave (no un pico), la corta que
+    # todavia esta pasando (no historia vieja).
+    - name: slo-disponibilidad-alertas
+      interval: 30s
+      rules:
+        # Ritmo 14.4: el presupuesto de la semana se acaba en ~12 h.
+        # 14.4 x 0.5 % = 7.2 % de peticiones con error.
+        - alert: SloDisponibilidadConsumoRapido
+          expr: |
+            slo:disponibilidad_errores:ratio_rate1h > (14.4 * 0.005)
+            and
+            slo:disponibilidad_errores:ratio_rate5m > (14.4 * 0.005)
+          for: 2m
+          labels:
+            severity: critica
+            slo: disponibilidad
+          annotations:
+            summary: "La tienda esta fallando: {{ $value | humanizePercentage }} de errores en la ultima hora"
+            description: "Mas del 7.2 % de las peticiones de clientes responden 5xx en la ultima hora y siguen fallando en los ultimos 5 min. A este ritmo el presupuesto de error de la semana se acaba en unas 12 horas."
+            intervencion: "Con ~3 peticiones por segundo, cada minuto son mas de 10 clientes con error. No se arregla sola: hay que encontrar la causa ya."
+            runbook_url: https://github.com/Joe1172003/Practicas-SA-B-202200271/blob/main/P10/runbooks/slo-disponibilidad-consumo-rapido.md
+
+        # Ritmo 6: el presupuesto se acaba en ~28 h.
+        # 6 x 0.5 % = 3 % de peticiones con error, sostenido.
+        - alert: SloDisponibilidadConsumoLento
+          expr: |
+            slo:disponibilidad_errores:ratio_rate6h > (6 * 0.005)
+            and
+            slo:disponibilidad_errores:ratio_rate30m > (6 * 0.005)
+          for: 15m
+          labels:
+            severity: advertencia
+            slo: disponibilidad
+          annotations:
+            summary: "Errores sostenidos en la tienda: {{ $value | humanizePercentage }} en 6 horas"
+            description: "Mas del 3 % de las peticiones fallan desde hace horas. No es una caida, es una degradacion: a este ritmo la promesa de la semana se rompe en poco mas de un dia."
+            intervencion: "No hace falta despertar a nadie, pero si revisarlo hoy: si se deja, el presupuesto se agota antes de que termine la semana."
+            runbook_url: https://github.com/Joe1172003/Practicas-SA-B-202200271/blob/main/P10/runbooks/slo-disponibilidad-consumo-lento.md
