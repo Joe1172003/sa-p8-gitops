@@ -10,10 +10,3 @@ recursos:
   limits:
     cpu: 300m
     memoria: 320Mi
-
-# FALLO INDUCIDO P10 (simulacro 2): "estandarizo" el puerto de productos a
-# 3005. El chart mueve todo junto (Service, contenedor, sondas, NetworkPolicy)
-# y los Pods quedan sanos, pero gateway y ordenes siguen llamando a
-# productos:3002 desde SU configuracion. Productos no tiene canary: el cambio
-# entra directo y el catalogo cae. Se revierte con el boton Revert del PR.
-puerto: 3005
