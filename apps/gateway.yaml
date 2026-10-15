@@ -27,6 +27,12 @@ spec:
     - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
       targetRevision: main
       ref: gitops
+    # P10: el AnalysisTemplate que decide el canary consultando Prometheus.
+    # Vive en este repo, junto al stack de observabilidad, y no en el chart:
+    # cambiar un umbral no deberia exigir sacar una version nueva del gateway.
+    - repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+      targetRevision: main
+      path: analisis
   destination:
     server: https://kubernetes.default.svc
     namespace: sa-p8

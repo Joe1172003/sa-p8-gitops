@@ -1,0 +1,30 @@
+# P10: clientes simulados, siempre encendidos. Sin trafico no hay metricas que
+# medir: ni el canary podria decidir con Prometheus ni los SLO tendrian datos.
+# Este k6 no juzga nada, solo genera trafico (ver trafico/usuarios.js).
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: trafico-usuarios
+  namespace: argocd
+  annotations:
+    # Despues de los microservicios (0): no tiene sentido simular clientes de
+    # una tienda que todavia no existe.
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+    targetRevision: main
+    path: trafico
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: trafico
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,67 @@
+# Un Pod de k6 que simula clientes todo el tiempo. Cuando termina su corrida de
+# 24 horas, Kubernetes lo vuelve a arrancar.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trafico-usuarios
+  labels:
+    app.kubernetes.io/name: trafico-usuarios
+    app.kubernetes.io/part-of: sa-p8
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trafico-usuarios
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trafico-usuarios
+        app.kubernetes.io/part-of: sa-p8
+    spec:
+      # k6 no le habla a la API de Kubernetes.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 12345
+        runAsGroup: 12345
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: k6
+          image: grafana/k6:1.8.1
+          args: ["run", "--quiet", "--no-color", "/scripts/usuarios.js"]
+          env:
+            # El Ingress Controller por dentro del cluster, con el Host publico:
+            # mismas reglas de Ingress (y mismo reparto canary) que un navegador.
+            - name: BASE
+              value: http://ingress-nginx-controller.ingress-nginx.svc
+            - name: HOST
+              value: 136.113.9.71.nip.io
+          envFrom:
+            # CORREO y CLAVE del usuario de las compras (secreto sellado).
+            - secretRef:
+                name: trafico-usuario
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: temporal
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: trafico-scripts
+        - name: temporal
+          emptyDir: {}
