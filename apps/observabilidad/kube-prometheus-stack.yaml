@@ -166,12 +166,16 @@ spec:
               hosts:
                 - grafana.136.113.9.71.nip.io
 
+            # 384Mi alcanzaba con los datasources solos. Con el tablero de
+            # operacion (16 paneles refrescando cada 30 s) Grafana llego a 383Mi,
+            # se trabo liberando memoria y sus sondas fallaron por timeout el
+            # 15/10: ObservabilidadDegradada lo detecto sola.
             resources:
               requests:
                 cpu: 50m
-                memory: 160Mi
+                memory: 256Mi
               limits:
-                memory: 384Mi
+                memory: 768Mi
 
             sidecar:
               resources:
