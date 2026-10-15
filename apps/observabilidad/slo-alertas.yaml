@@ -1,0 +1,30 @@
+# P10: los SLO y sus alertas. Prometheus lee cualquier PrometheusRule del
+# cluster (ruleSelectorNilUsesHelmValues: false), asi que basta con aplicarlas.
+#
+#   slo/slo-disponibilidad.yaml      SLO 1: 99.5 % sin 5xx, 7 dias
+#   slo/slo-catalogo-latencia.yaml   SLO 2: 99 % del catalogo < 500 ms, 7 dias
+#   slo/observabilidad.yaml          el stack mismo (la alerta que falto)
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: slo-alertas
+  namespace: argocd
+  annotations:
+    # Despues del operador de Prometheus (-1).
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+    targetRevision: main
+    path: slo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

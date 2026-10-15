@@ -1,0 +1,40 @@
+# La alerta que falto el 15/10 (P10).
+#
+# Tempo estuvo en CrashLoopBackOff (OOMKilled) unos 40 minutos y nadie se
+# entero: lo vi de casualidad en ArgoCD. Mientras tanto no se guardo ni una
+# traza. Si la telemetria se cae, las otras alertas y el canary quedan a
+# ciegas sin avisar.
+#
+# Limite conocido: si el que se cae es Prometheus, esta alerta tampoco suena,
+# porque la evalua el mismo Prometheus. Eso pide un vigilante externo.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: observabilidad
+  namespace: observabilidad
+spec:
+  groups:
+    - name: observabilidad-alertas
+      interval: 30s
+      rules:
+        - alert: ObservabilidadDegradada
+          # Un Pod del stack corriendo pero no listo, o reiniciandose en bucle.
+          # Solo Pods en Running: los Jobs que terminan no cuentan.
+          expr: |
+            (
+              sum by (pod) (kube_pod_status_ready{namespace="observabilidad", condition="false"}) > 0
+              or
+              sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="observabilidad"}[15m])) > 2
+            )
+            and on (pod)
+            (kube_pod_status_phase{namespace="observabilidad", phase="Running"} == 1)
+          for: 5m
+          labels:
+            severity: advertencia
+            slo: ninguno
+          annotations:
+            summary: "Un componente de observabilidad no esta sano: {{ $labels.pod }}"
+            description: "El Pod {{ $labels.pod }} lleva 5 minutos sin estar listo o se reinicio mas de 2 veces en 15 minutos. Mientras siga asi, faltan metricas, trazas o logs."
+            intervencion: "Sin telemetria las alertas de los SLO y el canary deciden a ciegas. No afecta a los clientes ahora, pero deja sin ojos al que tiene que atender la proxima falla."
+            runbook_url: https://github.com/Joe1172003/Practicas-SA-B-202200271/blob/main/P10/runbooks/observabilidad-degradada.md
