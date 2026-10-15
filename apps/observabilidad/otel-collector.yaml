@@ -76,6 +76,37 @@ spec:
               include:
                 - /var/log/pods/sa-p8_*/*/*.log
                 - /var/log/pods/ingress-nginx_*/*/*.log
+              # P10, fase 3. Los servicios escriben una linea JSON por evento
+              # con su trace_id. Aca se lee ese JSON y el trace_id pasa a ser el
+              # de la linea de log: Loki lo guarda como campo y Grafana salta de
+              # ese log a su traza en Tempo. El JSON original queda como esta.
+              operators:
+                # El del preset: quita el formato de CRI (fecha, stdout, etc.).
+                - type: container
+                  id: container-parser
+                  max_log_size: 102400
+                - type: json_parser
+                  id: json
+                  if: 'body matches "^\\{"'
+                  parse_from: body
+                  parse_to: attributes.json
+                  on_error: send_quiet
+                - type: trace_parser
+                  if: 'attributes.json != nil and attributes.json.trace_id != nil'
+                  trace_id:
+                    parse_from: attributes.json.trace_id
+                  span_id:
+                    parse_from: attributes.json.span_id
+                  on_error: send_quiet
+                - type: severity_parser
+                  if: 'attributes.json != nil and attributes.json.level != nil'
+                  parse_from: attributes.json.level
+                  on_error: send_quiet
+                # Ya se uso lo que hacia falta. Sin esto Loki guardaria cada
+                # campo del JSON dos veces.
+                - type: remove
+                  if: 'attributes.json != nil'
+                  field: attributes.json
 
           processors:
             k8sattributes:
