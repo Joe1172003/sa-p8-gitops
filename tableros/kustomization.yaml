@@ -1,0 +1,15 @@
+# El tablero de operacion como ConfigMap. El sidecar de Grafana busca en todo
+# el cluster los ConfigMap con la etiqueta grafana_dashboard=1 y los carga
+# solos: nadie arma el tablero a mano en la interfaz.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observabilidad
+configMapGenerator:
+  - name: tablero-operacion-sa-p10
+    files:
+      - operacion-sa-p10.json
+    options:
+      labels:
+        grafana_dashboard: "1"
+      # Nombre fijo: el sidecar ya detecta el cambio de contenido.
+      disableNameSuffixHash: true
