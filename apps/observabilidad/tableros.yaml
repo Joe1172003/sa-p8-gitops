@@ -1,0 +1,28 @@
+# P10: el tablero de operacion de Grafana, como codigo. La copia exportada
+# desde Grafana va en P10/tableros/ del repo de codigo.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tableros
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: plataforma
+  source:
+    repoURL: https://github.com/Joe1172003/sa-p8-gitops.git
+    targetRevision: main
+    path: tableros
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observabilidad
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Un tablero JSON grande pasa el limite de la anotacion de kubectl apply.
+      - ServerSideApply=true
