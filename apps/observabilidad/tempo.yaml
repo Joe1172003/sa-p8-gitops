@@ -30,12 +30,22 @@ spec:
                   endpoint: "0.0.0.0:4317"
                 http:
                   endpoint: "0.0.0.0:4318"
+          # Las trazas se juntan en memoria hasta cerrar un bloque y bajarlo a
+          # disco. Por defecto el bloque dura hasta 30 min: con el trafico
+          # continuo del generador (~3 peticiones/s, decenas de tramos cada
+          # una) Tempo paso los 768Mi, quedo en OOMKilled y al reiniciar
+          # volvia a caer recuperando el WAL. Bloques de 5 min y trazas que se
+          # dan por cerradas a los 10 s sin tramos nuevos: menos en memoria.
+          ingester:
+            trace_idle_period: 10s
+            max_block_duration: 5m
+            complete_block_timeout: 15m
           resources:
             requests:
               cpu: 50m
-              memory: 256Mi
+              memory: 512Mi
             limits:
-              memory: 768Mi
+              memory: 1536Mi
 
         persistence:
           enabled: true
