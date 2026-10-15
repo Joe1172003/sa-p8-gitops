@@ -11,7 +11,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: d65ee72b8f9bbb27944cae35786f77828e649771 # v2.4.3
+      targetRevision: 0ba9cd2a20ae977067b4a5f480051fdf96d342fc # v2.5.0
       path: P8/charts/rabbitmq
       helm:
         releaseName: rabbitmq
