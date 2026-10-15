@@ -10,7 +10,7 @@ spec:
   project: sa-p8
   sources:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
-      targetRevision: 0d1a7240524c2f1b7f34be6702926929f7cba11a # v2.2.1 con anti-afinidad
+      targetRevision: e06e6e706843f2144f54d64a4dae0ec21faeb363 # v2.4.0
       path: P8/charts/auth
       helm:
         releaseName: auth
