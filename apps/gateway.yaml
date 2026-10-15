@@ -15,7 +15,7 @@ spec:
     - repoURL: https://github.com/Joe1172003/Practicas-SA-B-202200271.git
       # Un commit exacto y no main: si cambio el chart en main, produccion no
       # se entera hasta que alguien actualice esta linea con un PR.
-      targetRevision: e06e6e706843f2144f54d64a4dae0ec21faeb363 # v2.4.0
+      targetRevision: c415fa5b41d8eab28fa3f5daead743f0c21e8b55 # v2.4.1
       path: P8/charts/gateway
       helm:
         releaseName: gateway
