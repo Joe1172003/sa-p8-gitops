@@ -1,0 +1,12 @@
+# Kustomize empaqueta usuarios.js como ConfigMap con un hash en el nombre: si
+# cambio el script, cambia el nombre y el Pod se reemplaza solo.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: trafico
+resources:
+  - deployment.yaml
+  - secreto.yaml
+configMapGenerator:
+  - name: trafico-scripts
+    files:
+      - usuarios.js

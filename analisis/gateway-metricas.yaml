@@ -1,0 +1,98 @@
+# P10: lo que decide si una version nueva del gateway se queda o se revierte.
+#
+# En la P8 el canary corria Jobs de k6 durante 30 o 45 segundos. La v2.4.0 sana
+# fallo dos veces y paso a la tercera por 11 ms, segun lo ocupado que estuviera
+# el cluster en ese instante. Ahora no se corre ninguna prueba: mientras la
+# version nueva atiende trafico real, Prometheus la mide cada 30 s.
+#
+# La candidata y la estable se distinguen por el hash de su ReplicaSet, que va
+# en el nombre de cada Pod (k8s_pod_name). Los dos hashes los pasa el Rollout.
+# Las metricas vienen de OpenTelemetry en el propio gateway (sin /health).
+
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: gateway-metricas
+  namespace: sa-p8
+spec:
+  args:
+    - name: hash-candidata
+    - name: hash-estable
+    - name: prometheus
+      value: http://kps-prometheus.observabilidad.svc:9090
+
+  metrics:
+    # 1. Que la candidata haya atendido trafico de verdad. Con muy pocas
+    # peticiones cualquier porcentaje es ruido: no aprueba ni reprueba, queda
+    # "no concluyente" y el canary se detiene a esperar a una persona.
+    - name: trafico-candidata
+      interval: 30s
+      initialDelay: 60s
+      successCondition: result[0] >= 20
+      failureCondition: result[0] < 0
+      inconclusiveLimit: 6
+      provider:
+        prometheus:
+          address: "{{args.prometheus}}"
+          query: |
+            sum(increase(http_server_request_duration_seconds_count{job="gateway",
+                k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m]))
+            or vector(0)
+
+    # 2. Tasa de error de la candidata: respuestas 5xx sobre el total, en los
+    # ultimos 2 minutos. Los 4xx no cuentan: son errores del cliente.
+    # Menos de 5 %: con ~70 peticiones en la ventana un solo error ya es 1.4 %,
+    # y no quiero revertir por un tropiezo aislado. Una version rota falla en
+    # masa. failureLimit 1: hacen falta dos lecturas malas seguidas.
+    - name: tasa-de-error
+      interval: 30s
+      initialDelay: 60s
+      successCondition: result[0] < 0.05
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: "{{args.prometheus}}"
+          query: |
+            (sum(rate(http_server_request_duration_seconds_count{job="gateway",
+                k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*",
+                http_response_status_code=~"5.."}[2m])) or vector(0))
+            /
+            clamp_min(sum(rate(http_server_request_duration_seconds_count{job="gateway",
+                k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m])) or vector(0), 0.0001)
+
+    # 3. p95 de la candidata dividido el p95 de la estable, en la misma ventana.
+    # Si el cluster esta ocupado, las dos se ponen lentas por igual y la
+    # proporcion no cambia: solo se revierte si la candidata es peor. Hasta el
+    # doble: los buckets del histograma (250, 500, 750 ms) son gruesos y una
+    # proporcion mas fina saltaria por redondeo. NaN = todavia sin datos.
+    - name: latencia-p95-relativa
+      interval: 30s
+      initialDelay: 60s
+      successCondition: isNaN(result[0]) || result[0] <= 2
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: "{{args.prometheus}}"
+          query: |
+            (
+              histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="gateway",
+                  k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m])))
+              /
+              histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="gateway",
+                  k8s_pod_name=~"gateway-{{args.hash-estable}}-.*"}[2m])))
+            ) or vector(1)
+
+    # 4. Techo absoluto: aunque la estable tambien este lenta, la candidata no
+    # pasa si su p95 llega a 1 s. Ahi el usuario ya siente la espera.
+    - name: latencia-p95-maxima
+      interval: 30s
+      initialDelay: 60s
+      successCondition: isNaN(result[0]) || result[0] < 1
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: "{{args.prometheus}}"
+          query: |
+            histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="gateway",
+                k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m])))
+            or vector(0)
