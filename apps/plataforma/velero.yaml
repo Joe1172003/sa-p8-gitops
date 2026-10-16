@@ -82,10 +82,12 @@ spec:
               # Retencion: cada respaldo se borra solo a los 3 dias. Con esta
               # frecuencia quedan 24 respaldos vivos.
               ttl: 72h
-              # Solo el namespace de la plataforma: lo demas se reconstruye
-              # desde Git, no hace falta respaldarlo.
+              # El namespace de la plataforma y el de la llave de Sealed
+              # Secrets: lo demas se reconstruye desde Git. La llave ya vive en
+              # Secret Manager; esta es una segunda copia, en el bucket.
               includedNamespaces:
                 - sa-p8
+                - sealed-secrets
               # Lo que de verdad importa: los discos de postgres y rabbitmq.
               # Sin esto el respaldo traeria los objetos pero ningun dato.
               snapshotVolumes: true
