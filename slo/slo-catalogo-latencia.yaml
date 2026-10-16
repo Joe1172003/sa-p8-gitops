@@ -76,6 +76,7 @@ spec:
         # agotado en ~12 h.
         - alert: SloCatalogoLatenciaConsumoRapido
           expr: |
+            # Burn rate 14.4: consumo del presupuesto de error en 1h y 5m.
             slo:catalogo_lentas:ratio_rate1h > (14.4 * 0.01)
             and
             slo:catalogo_lentas:ratio_rate5m > (14.4 * 0.01)
@@ -92,6 +93,7 @@ spec:
         # Ritmo 6: 6 % de consultas lentas sostenido, presupuesto en ~28 h.
         - alert: SloCatalogoLatenciaConsumoLento
           expr: |
+            # Burn rate 6: consumo del presupuesto de error en 6h y 30m.
             slo:catalogo_lentas:ratio_rate6h > (6 * 0.01)
             and
             slo:catalogo_lentas:ratio_rate30m > (6 * 0.01)

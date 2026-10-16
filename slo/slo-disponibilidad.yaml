@@ -74,6 +74,7 @@ spec:
         # 14.4 x 0.5 % = 7.2 % de peticiones con error.
         - alert: SloDisponibilidadConsumoRapido
           expr: |
+            # Burn rate 14.4: consumo del presupuesto de error en 1h y 5m.
             slo:disponibilidad_errores:ratio_rate1h > (14.4 * 0.005)
             and
             slo:disponibilidad_errores:ratio_rate5m > (14.4 * 0.005)
@@ -91,6 +92,7 @@ spec:
         # 6 x 0.5 % = 3 % de peticiones con error, sostenido.
         - alert: SloDisponibilidadConsumoLento
           expr: |
+            # Burn rate 6: consumo del presupuesto de error en 6h y 30m.
             slo:disponibilidad_errores:ratio_rate6h > (6 * 0.005)
             and
             slo:disponibilidad_errores:ratio_rate30m > (6 * 0.005)
