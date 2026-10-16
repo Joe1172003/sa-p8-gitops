@@ -35,9 +35,7 @@ spec:
         prometheus:
           address: "{{args.prometheus}}"
           query: |
-            sum(increase(http_server_request_duration_seconds_count{job="gateway",
-                k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m]))
-            or vector(0)
+            sum(increase(http_server_request_duration_seconds_count{job="gateway", k8s_pod_name=~"gateway-{{args.hash-candidata}}-.*"}[2m])) or vector(0)
 
     # 2. Tasa de error de la candidata: respuestas 5xx sobre el total, en los
     # ultimos 2 minutos. Los 4xx no cuentan: son errores del cliente.
